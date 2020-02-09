@@ -58,9 +58,18 @@ public class NetworkMan : MonoBehaviour
             public float b;
         }
         public receivedColor color;
+        public Vector3 position;
+        public Quaternion rotation;
     }
 
     [Serializable]
+    public class PlayerForJson
+    {
+        public Quaternion rotation;
+        public Vector3 position;
+    }
+
+        [Serializable]
     public class NewPlayer
     {
         public GameObject playerObj;
@@ -130,6 +139,18 @@ public class NetworkMan : MonoBehaviour
         socket.BeginReceive(new AsyncCallback(OnReceived), socket);
     }
 
+    public void SendPlayerInfo(Transform trans)
+    {
+        PlayerForJson playerInfo = new PlayerForJson();
+        playerInfo.position = trans.position;
+        playerInfo.rotation = trans.rotation;
+
+        string jsonString = JsonUtility.ToJson(playerInfo);
+        Debug.Log(jsonString);
+        Byte[] sendBytes = Encoding.ASCII.GetBytes(jsonString);
+        udp.Send(sendBytes, sendBytes.Length);
+    }
+
     void SpawnPlayers()
     {
         if (lastestGameState.players.Length > 0 && ClientID == null)
@@ -150,6 +171,10 @@ public class NetworkMan : MonoBehaviour
             temp.player.id = lastestGameState.players[len].id;
             temp.playerObj.GetComponent<ClientCube>().id = temp.player.id;
 
+            temp.playerObj.AddComponent<PlayerCS>();
+            temp.playerObj.GetComponent<PlayerCS>().id = temp.player.id;
+            temp.playerObj.GetComponent<PlayerCS>().netMan = this;
+
             newPlayers.Add(temp);
             len++;
         }
@@ -163,13 +188,26 @@ public class NetworkMan : MonoBehaviour
             // if (ClientID == lastestGameState.players[i].id)
             // {
             //Debug.Log("Find Update Target");
-            Debug.Log(new Color(lastestGameState.players[i].color.r, lastestGameState.players[i].color.g, lastestGameState.players[i].color.b));
+            //Debug.Log(new Color(lastestGameState.players[i].color.r, lastestGameState.players[i].color.g, lastestGameState.players[i].color.b));
 
             Color color = new Color(lastestGameState.players[i].color.r, lastestGameState.players[i].color.g, lastestGameState.players[i].color.b);
             newPlayers[i].player.color.r = color.r;
             newPlayers[i].player.color.g = color.g;
             newPlayers[i].player.color.b = color.b;
             newPlayers[i].playerObj.GetComponent<Renderer>().material.SetColor("_Color", color);
+            
+            if (ClientID != lastestGameState.players[i].id)
+            {
+                newPlayers[i].playerObj.transform.position = lastestGameState.players[i].position;
+                newPlayers[i].playerObj.transform.rotation = lastestGameState.players[i].rotation;
+            }
+            else
+            {
+                lastestGameState.players[i].position = newPlayers[i].playerObj.transform.position;
+                lastestGameState.players[i].rotation = newPlayers[i].playerObj.transform.rotation;
+            }
+            //newPlayers[i].playerObj.transform.position = lastestGameState.players[i].position;
+            //newPlayers[i].playerObj.transform.rotation = lastestGameState.players[i].rotation;
             // }
         }
     }
@@ -224,7 +262,7 @@ public class NetworkMan : MonoBehaviour
         {
             Debug.Log("Client Dropped");
             ShowAllClient();
-            RelocateBox();
+            //RelocateBox();
         }
     }
 }
